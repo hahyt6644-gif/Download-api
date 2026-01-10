@@ -13,17 +13,22 @@ app.get("/api", async (req, res) => {
     }
 
     const browser = await puppeteer.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        "--single-process",
+        "--no-zygote"
+      ],
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless
+      headless: chromium.headless,
+      timeout: 120000   // ⬅ 2 MINUTE launch timeout
     });
 
     const page = await browser.newPage();
 
     await page.goto(url, {
       waitUntil: "domcontentloaded",
-      timeout: 10000
+      timeout: 20000
     });
 
     await page.waitForTimeout(5000);
@@ -57,9 +62,9 @@ app.get("/api", async (req, res) => {
         encodeURIComponent(data.found);
 
       return res.json({
-        status: true,
-        original: data.found,
-        player: final
+        status:true,
+        original:data.found,
+        player:final
       });
     }
 
