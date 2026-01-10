@@ -9,41 +9,56 @@ def scrape():
 
     url = request.args.get("url")
     if not url:
-        return jsonify({"status":False,"msg":"URL required"})
+        return jsonify({"status": False, "msg": "URL required"})
+
+    all_links = []
 
     with sync_playwright() as p:
 
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox"]
+        )
+
         page = browser.new_page()
 
-        page.goto(url, wait_until="networkidle")
-        page.wait_for_timeout(4000)
+        # Wait max 10 sec
+        page.goto(url, wait_until="domcontentloaded", timeout=10000)
+
+        # extra wait (5 sec)
+        page.wait_for_timeout(5000)
 
         links = page.query_selector_all("a")
 
         found = None
         for a in links:
             href = a.get_attribute("href")
+            if href:
+                all_links.append(href)
+
             if href and "iteraplay.tera-api61.workers.dev/download" in href:
                 found = href
-                break
 
         browser.close()
 
-    if not found:
+    # If found
+    if found:
+        final_url = "https://playterabox.com/player?url=" + \
+                    urllib.parse.quote(found)
+
         return jsonify({
-            "status":False,
-            "msg":"Download link not found"
+            "status": True,
+            "original": found,
+            "player": final_url
         })
 
-    final_url = "https://playterabox.com/player?url=" + \
-                urllib.parse.quote(found)
-
+    # If NOT found → show all links
     return jsonify({
-        "status":True,
-        "original":found,
-        "player":final_url
+        "status": False,
+        "msg": "Download link not found",
+        "all_links": all_links
     })
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
