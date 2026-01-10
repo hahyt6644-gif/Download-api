@@ -1,24 +1,22 @@
 const express = require("express");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
+const chromium = require("@sparticuz/chromium");
 
 const app = express();
-
-// HARDCODED chrome path (from your logs)
-const CHROME_PATH =
-"/opt/render/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome";
 
 app.get("/api", async (req, res) => {
   try {
 
     const url = req.query.url;
     if (!url) {
-      return res.json({ status: false, msg: "URL required" });
+      return res.json({ status:false, msg:"URL required" });
     }
 
     const browser = await puppeteer.launch({
-      headless: "new",
-      executablePath: CHROME_PATH,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless
     });
 
     const page = await browser.newPage();
@@ -31,6 +29,7 @@ app.get("/api", async (req, res) => {
     await page.waitForTimeout(5000);
 
     const data = await page.evaluate(() => {
+
       const links = [...document.querySelectorAll("a")];
       let all = [];
       let found = null;
@@ -38,7 +37,6 @@ app.get("/api", async (req, res) => {
       links.forEach(a => {
         if (a.href) {
           all.push(a.href);
-
           if (
             a.href.includes("iteraplay.tera-api") &&
             a.href.includes("/download?")
@@ -66,14 +64,14 @@ app.get("/api", async (req, res) => {
     }
 
     return res.json({
-      status: false,
-      msg: "Download link not found",
-      all_links: data.all
+      status:false,
+      msg:"Download link not found",
+      all_links:data.all
     });
 
-  } catch (err) {
+  } catch(err){
     return res.json({
-      status: false,
+      status:false,
       error: err.toString()
     });
   }
