@@ -31,48 +31,75 @@ app.get("/api", async (req, res) => {
       timeout: 60000
     });
 
-    await page.waitForTimeout(5000);
+    /* -----------------
+       WAIT FIRST 10s
+    ------------------*/
+    await page.waitForTimeout(10000);
 
-    const result = await page.evaluate(() => {
-
-      const html = document.documentElement.outerHTML;
+    let found = await page.evaluate(() => {
       const links = [...document.querySelectorAll("a")];
-
-      let found = null;
-
-      links.forEach(a => {
+      for (let a of links) {
         if (
           a.href.includes("iteraplay.tera-api") &&
           a.href.includes("/download?")
         ) {
-          found = a.href;
+          return a.href;
         }
-      });
-
-      return { found, html };
+      }
+      return null;
     });
 
-    await browser.close();
+    /* -----------------
+       IF NOT FOUND
+       WAIT EXTRA 5s
+    ------------------*/
+    if (!found) {
 
-    // ✅ FOUND
-    if (result.found) {
+      await page.waitForTimeout(5000);
+
+      found = await page.evaluate(() => {
+        const links = [...document.querySelectorAll("a")];
+        for (let a of links) {
+          if (
+            a.href.includes("iteraplay.tera-api") &&
+            a.href.includes("/download?")
+          ) {
+            return a.href;
+          }
+        }
+        return null;
+      });
+    }
+
+    /* -----------------
+       IF FOUND
+    ------------------*/
+    if (found) {
 
       const final =
         "https://playterabox.com/player?url=" +
-        encodeURIComponent(result.found);
+        encodeURIComponent(found);
+
+      await browser.close();
 
       return res.json({
         status:true,
-        original:result.found,
+        original:found,
         player:final
       });
     }
 
-    // ❌ NOT FOUND → SEND HTML
+    /* -----------------
+       STILL NOT FOUND
+       RETURN HTML
+    ------------------*/
+    const html = await page.content();
+    await browser.close();
+
     return res.json({
       status:false,
       msg:"Download link not found",
-      html: result.html
+      html: html
     });
 
   } catch(err){
