@@ -21,14 +21,15 @@ app.get("/api", async (req, res) => {
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
-      timeout: 120000   // ⬅ 2 MINUTE launch timeout
+      timeout: 120000
     });
 
     const page = await browser.newPage();
 
+    // ⬇ Increased timeout
     await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: 20000
+      waitUntil: "networkidle2",
+      timeout: 60000
     });
 
     await page.waitForTimeout(5000);
