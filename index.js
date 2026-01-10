@@ -26,7 +26,6 @@ app.get("/api", async (req, res) => {
 
     const page = await browser.newPage();
 
-    // ⬇ Increased timeout
     await page.goto(url, {
       waitUntil: "networkidle2",
       timeout: 60000
@@ -34,45 +33,46 @@ app.get("/api", async (req, res) => {
 
     await page.waitForTimeout(5000);
 
-    const data = await page.evaluate(() => {
+    const result = await page.evaluate(() => {
 
+      const html = document.documentElement.outerHTML;
       const links = [...document.querySelectorAll("a")];
-      let all = [];
+
       let found = null;
 
       links.forEach(a => {
-        if (a.href) {
-          all.push(a.href);
-          if (
-            a.href.includes("iteraplay.tera-api") &&
-            a.href.includes("/download?")
-          ) {
-            found = a.href;
-          }
+        if (
+          a.href.includes("iteraplay.tera-api") &&
+          a.href.includes("/download?")
+        ) {
+          found = a.href;
         }
       });
 
-      return { found, all };
+      return { found, html };
     });
 
     await browser.close();
 
-    if (data.found) {
+    // ✅ FOUND
+    if (result.found) {
+
       const final =
         "https://playterabox.com/player?url=" +
-        encodeURIComponent(data.found);
+        encodeURIComponent(result.found);
 
       return res.json({
         status:true,
-        original:data.found,
+        original:result.found,
         player:final
       });
     }
 
+    // ❌ NOT FOUND → SEND HTML
     return res.json({
       status:false,
       msg:"Download link not found",
-      all_links:data.all
+      html: result.html
     });
 
   } catch(err){
