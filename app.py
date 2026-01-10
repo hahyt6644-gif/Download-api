@@ -23,7 +23,7 @@ def scrape():
 
         page = browser.new_page()
 
-        # wait only 10 sec
+        # wait max 10 sec
         page.goto(url, wait_until="domcontentloaded", timeout=10000)
         page.wait_for_timeout(5000)
 
@@ -34,13 +34,11 @@ def scrape():
             if href:
                 all_links.append(href)
 
-                # MATCH ANY iteraplay tera api
                 if "iteraplay.tera-api" in href and "/download?" in href:
                     found = href
 
         browser.close()
 
-    # If found
     if found:
         final_url = "https://playterabox.com/player?url=" + \
                     urllib.parse.quote(found)
@@ -51,7 +49,6 @@ def scrape():
             "player": final_url
         })
 
-    # If not found
     return jsonify({
         "status": False,
         "msg": "Download link not found",
