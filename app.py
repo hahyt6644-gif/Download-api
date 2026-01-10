@@ -12,6 +12,7 @@ def scrape():
         return jsonify({"status": False, "msg": "URL required"})
 
     all_links = []
+    found = None
 
     with sync_playwright() as p:
 
@@ -22,22 +23,20 @@ def scrape():
 
         page = browser.new_page()
 
-        # Wait max 10 sec
+        # wait only 10 sec
         page.goto(url, wait_until="domcontentloaded", timeout=10000)
-
-        # extra wait (5 sec)
         page.wait_for_timeout(5000)
 
         links = page.query_selector_all("a")
 
-        found = None
         for a in links:
             href = a.get_attribute("href")
             if href:
                 all_links.append(href)
 
-            if href and "iteraplay.tera-api61.workers.dev/download" in href:
-                found = href
+                # MATCH ANY iteraplay tera api
+                if "iteraplay.tera-api" in href and "/download?" in href:
+                    found = href
 
         browser.close()
 
@@ -52,7 +51,7 @@ def scrape():
             "player": final_url
         })
 
-    # If NOT found → show all links
+    # If not found
     return jsonify({
         "status": False,
         "msg": "Download link not found",
