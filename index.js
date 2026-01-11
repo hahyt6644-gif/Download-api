@@ -1,5 +1,5 @@
 const express = require("express");
-const puppeteer = require("puppeteer-core");
+const puppeteer = require("puppeteer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,8 +10,7 @@ app.get("/dom", async (req, res) => {
     if (!url) return res.send("URL missing");
 
     const browser = await puppeteer.launch({
-      executablePath: process.env.CHROME_PATH || "/usr/bin/chromium-browser",
-      headless: true,
+      headless: "new",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -21,16 +20,11 @@ app.get("/dom", async (req, res) => {
 
     const page = await browser.newPage();
 
-    await page.setUserAgent(
-      "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"
-    );
-
     await page.goto(url, {
       waitUntil: "networkidle2",
       timeout: 60000
     });
 
-    // wait 10 sec
     await page.waitForTimeout(10000);
 
     const html = await page.evaluate(() =>
