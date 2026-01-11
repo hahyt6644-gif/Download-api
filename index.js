@@ -1,115 +1,55 @@
 const express = require("express");
-const puppeteer = require("puppeteer-core");
-const chromium = require("@sparticuz/chromium");
+const puppeteer = require("puppeteer");
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.get("/api", async (req, res) => {
+app.get("/dom", async (req, res) => {
   try {
-
     const url = req.query.url;
-    if (!url) {
-      return res.json({ status:false, msg:"URL required" });
-    }
+    if (!url) return res.send("URL missing");
 
     const browser = await puppeteer.launch({
-      args: [
-        ...chromium.args,
-        "--single-process",
-        "--no-zygote"
-      ],
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-      timeout: 120000
+      headless: true,
+      args: ['--no-sandbox','--disable-setuid-sandbox']
     });
 
     const page = await browser.newPage();
 
-    await page.goto(url, {
-      waitUntil: "networkidle2",
-      timeout: 60000
-    });
+    await page.goto(url, { waitUntil: "networkidle2" });
 
-    /* -----------------
-       WAIT FIRST 10s
-    ------------------*/
+    // wait 10 seconds
     await page.waitForTimeout(10000);
 
-    let found = await page.evaluate(() => {
-      const links = [...document.querySelectorAll("a")];
-      for (let a of links) {
-        if (
-          a.href.includes("iteraplay.tera-api") &&
-          a.href.includes("/download?")
-        ) {
-          return a.href;
-        }
-      }
-      return null;
+    // auto scroll
+    await page.evaluate(async () => {
+      await new Promise(resolve => {
+        let h = 0;
+        let t = setInterval(() => {
+          window.scrollBy(0,300);
+          h += 300;
+          if(h >= document.body.scrollHeight){
+            clearInterval(t);
+            resolve();
+          }
+        },300);
+      });
     });
 
-    /* -----------------
-       IF NOT FOUND
-       WAIT EXTRA 5s
-    ------------------*/
-    if (!found) {
+    const html = await page.evaluate(() =>
+      document.documentElement.outerHTML
+    );
 
-      await page.waitForTimeout(5000);
-
-      found = await page.evaluate(() => {
-        const links = [...document.querySelectorAll("a")];
-        for (let a of links) {
-          if (
-            a.href.includes("iteraplay.tera-api") &&
-            a.href.includes("/download?")
-          ) {
-            return a.href;
-          }
-        }
-        return null;
-      });
-    }
-
-    /* -----------------
-       IF FOUND
-    ------------------*/
-    if (found) {
-
-      const final =
-        "https://playterabox.com/player?url=" +
-        encodeURIComponent(found);
-
-      await browser.close();
-
-      return res.json({
-        status:true,
-        original:found,
-        player:final
-      });
-    }
-
-    /* -----------------
-       STILL NOT FOUND
-       RETURN HTML
-    ------------------*/
-    const html = await page.content();
     await browser.close();
 
-    return res.json({
-      status:false,
-      msg:"Download link not found",
-      html: html
-    });
+    res.set("Content-Type","text/html");
+    res.send(html);
 
-  } catch(err){
-    return res.json({
-      status:false,
-      error: err.toString()
-    });
+  } catch (e) {
+    res.send("ERROR: " + e.message);
   }
 });
 
-app.listen(process.env.PORT || 10000, () => {
-  console.log("API running");
-});
+app.listen(PORT, () =>
+  console.log("API running on", PORT)
+);
