@@ -1,7 +1,6 @@
 {
-  "name": "js-rendered-api",
+  "name": "render-js-api",
   "version": "1.0.0",
-  "description": "API to return rendered HTML after 10s wait",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
