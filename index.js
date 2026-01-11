@@ -1,6 +1,5 @@
 const express = require('express');
-const puppeteer = require('puppeteer-core');
-const chromium = require('chrome-aws-lambda'); // Add this for Chrome AWS Lambda support
+const puppeteer = require('puppeteer');
 
 const app = express();
 
@@ -10,12 +9,12 @@ app.get('/network', async (req, res) => {
 
   if (!url) return res.json({ error: "URL required" });
 
-  // Launch browser with chrome-aws-lambda
   const browser = await puppeteer.launch({
-    executablePath: await chromium.executablePath,
-    headless: chromium.headless,
-    args: chromium.args,
-    ignoreHTTPSErrors: true,
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox'
+    ]
   });
 
   const page = await browser.newPage();
@@ -40,7 +39,7 @@ app.get('/network', async (req, res) => {
 
   await page.goto(url, { waitUntil: "domcontentloaded" });
 
-  // FIX: Wait for the given time
+  // wait custom time
   await new Promise(r => setTimeout(r, wait));
 
   await browser.close();
