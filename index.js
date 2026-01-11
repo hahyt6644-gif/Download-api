@@ -2,18 +2,29 @@ const express = require('express');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const { execSync } = require('child_process');
+const fs = require('fs');
 
 puppeteer.use(StealthPlugin());
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Helper function to find Chrome on Render's disk
-function getChromePath() {
+/**
+ * Dynamically finds the Chrome binary on Render's filesystem
+ */
+function findChromePath() {
     try {
-        // This command finds the actual executable path dynamically
-        return execSync('find /opt/render/.cache/puppeteer -name chrome | head -n 1').toString().trim();
+        // This command searches the Render cache specifically for the chrome executable
+        const path = execSync('find /opt/render/.cache/puppeteer -name chrome -type f | head -n 1')
+            .toString()
+            .trim();
+        
+        if (path && fs.existsSync(path)) {
+            return path;
+        }
+        return null;
     } catch (e) {
+        console.error("Error finding Chrome path:", e);
         return null;
     }
 }
@@ -27,12 +38,12 @@ app.get('/render', async (req, res) => {
 
     let browser;
     try {
-        const executablePath = getChromePath();
-        console.log(`Using Chrome at: ${executablePath}`);
+        const chromePath = findChromePath();
+        console.log(`Attempting to launch Chrome from: ${chromePath}`);
 
         browser = await puppeteer.launch({
             headless: "new",
-            executablePath: executablePath, 
+            executablePath: chromePath, // Use the auto-discovered path
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -43,41 +54,41 @@ app.get('/render', async (req, res) => {
 
         const page = await browser.newPage();
         
-        // Emulate a standard desktop browser
+        // Setup page
         await page.setViewport({ width: 1280, height: 800 });
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
 
         console.log(`Navigating to: ${targetUrl}`);
         
-        // Wait for initial load
+        // 1. Load the page (wait until basic network is quiet)
         await page.goto(targetUrl, { 
             waitUntil: 'networkidle2', 
             timeout: 60000 
         });
 
-        // --- THE 10 SECOND WAIT ---
-        console.log('Waiting 10 seconds for all JS elements to render...');
+        // 2. WAIT FOR 10 SECONDS
+        console.log('Waiting 10 seconds for JS to fully render...');
         await new Promise(resolve => setTimeout(resolve, 10000));
 
-        // Capture the fully rendered "Elements" HTML
-        const renderedHtml = await page.content();
+        // 3. Get the "DevTools Elements" HTML
+        const html = await page.content();
 
         await browser.close();
         
         res.setHeader('Content-Type', 'text/html');
-        res.send(renderedHtml);
+        res.status(200).send(html);
 
     } catch (error) {
-        console.error("ERROR:", error.message);
+        console.error("CRITICAL ERROR:", error);
         if (browser) await browser.close();
-        res.status(500).send({ 
+        res.status(500).json({ 
             error: 'Rendering failed', 
             message: error.message,
-            tip: "Ensure your Render Build Command is: npm install && npx puppeteer browsers install chrome"
+            detected_path: findChromePath()
         });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`);
+    console.log(`API Server live on port ${PORT}`);
 });
