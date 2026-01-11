@@ -25,6 +25,7 @@ app.get("/dom", async (req, res) => {
       timeout: 60000
     });
 
+    // wait 10 sec
     await page.waitForTimeout(10000);
 
     const html = await page.evaluate(() =>
