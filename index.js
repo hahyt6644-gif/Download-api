@@ -1,47 +1,62 @@
-const express = require("express");
-const puppeteer = require("puppeteer");
+const express = require('express');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+puppeteer.use(StealthPlugin());
 
 const app = express();
+// Render sets the PORT automatically via environment variable
 const PORT = process.env.PORT || 3000;
 
-app.get("/dom", async (req, res) => {
-  try {
-    const url = req.query.url;
-    if (!url) return res.send("URL missing");
+app.get('/render', async (req, res) => {
+    const targetUrl = req.query.url;
 
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
-      ]
-    });
+    if (!targetUrl) {
+        return res.status(400).send({ error: 'Please provide a URL parameter (?url=...)' });
+    }
 
-    const page = await browser.newPage();
+    let browser;
+    try {
+        browser = await puppeteer.launch({ 
+            headless: "new",
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+            args: [
+                '--no-sandbox', 
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--single-process'
+            ] 
+        });
 
-    await page.goto(url, {
-      waitUntil: "networkidle2",
-      timeout: 60000
-    });
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1280, height: 900 });
 
-    // wait 10 sec
-    await page.waitForTimeout(10000);
+        console.log(`Navigating to: ${targetUrl}`);
+        
+        // Wait until initial network load is done
+        await page.goto(targetUrl, { 
+            waitUntil: 'networkidle2', 
+            timeout: 60000 
+        });
 
-    const html = await page.evaluate(() =>
-      document.documentElement.outerHTML
-    );
+        // HARD WAIT: 10 seconds for all JS/Lazy-loading
+        console.log('Waiting 10 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 10000));
 
-    await browser.close();
+        // Get the "Elements" panel version of the HTML
+        const renderedHtml = await page.content();
 
-    res.set("Content-Type", "text/html");
-    res.send(html);
+        await browser.close();
+        res.setHeader('Content-Type', 'text/html');
+        res.send(renderedHtml);
 
-  } catch (e) {
-    res.send("ERROR: " + e.message);
-  }
+    } catch (error) {
+        console.error("ERROR:", error.message);
+        if (browser) await browser.close();
+        res.status(500).send({ error: 'Rendering failed', message: error.message });
+    }
 });
 
 app.listen(PORT, () => {
-  console.log("API running on", PORT);
+    console.log(`Server is running on port ${PORT}`);
 });
