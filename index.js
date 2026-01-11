@@ -1,5 +1,5 @@
 const express = require("express");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,6 +10,7 @@ app.get("/dom", async (req, res) => {
     if (!url) return res.send("URL missing");
 
     const browser = await puppeteer.launch({
+      executablePath: process.env.CHROME_PATH || "/usr/bin/chromium-browser",
       headless: true,
       args: [
         "--no-sandbox",
@@ -20,7 +21,6 @@ app.get("/dom", async (req, res) => {
 
     const page = await browser.newPage();
 
-    // Mobile user-agent
     await page.setUserAgent(
       "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"
     );
@@ -32,21 +32,6 @@ app.get("/dom", async (req, res) => {
 
     // wait 10 sec
     await page.waitForTimeout(10000);
-
-    // auto scroll
-    await page.evaluate(async () => {
-      await new Promise(resolve => {
-        let h = 0;
-        let t = setInterval(() => {
-          window.scrollBy(0, 300);
-          h += 300;
-          if (h >= document.body.scrollHeight) {
-            clearInterval(t);
-            resolve();
-          }
-        }, 300);
-      });
-    });
 
     const html = await page.evaluate(() =>
       document.documentElement.outerHTML
