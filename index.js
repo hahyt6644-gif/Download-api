@@ -4,52 +4,57 @@ const puppeteer = require('puppeteer');
 const app = express();
 
 app.get('/network', async (req, res) => {
-  const url = req.query.url;
-  const wait = parseInt(req.query.wait || 5000);
+  try {
+    const url = req.query.url;
+    const wait = parseInt(req.query.wait || 5000);
 
-  if (!url) return res.json({ error: "URL required" });
+    if (!url) return res.json({ error: "URL required" });
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox'
-    ]
-  });
-
-  const page = await browser.newPage();
-  let logs = [];
-
-  page.on('request', r => {
-    logs.push({
-      type: "request",
-      url: r.url(),
-      method: r.method(),
-      resource: r.resourceType()
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage'
+      ]
     });
-  });
 
-  page.on('response', r => {
-    logs.push({
-      type: "response",
-      url: r.url(),
-      status: r.status()
+    const page = await browser.newPage();
+    let logs = [];
+
+    page.on('request', r => {
+      logs.push({
+        type: "request",
+        url: r.url(),
+        method: r.method(),
+        resource: r.resourceType()
+      });
     });
-  });
 
-  await page.goto(url, { waitUntil: "domcontentloaded" });
+    page.on('response', r => {
+      logs.push({
+        type: "response",
+        url: r.url(),
+        status: r.status()
+      });
+    });
 
-  // wait custom time
-  await new Promise(r => setTimeout(r, wait));
+    await page.goto(url, { waitUntil: "domcontentloaded" });
 
-  await browser.close();
+    await new Promise(r => setTimeout(r, wait));
 
-  res.json({
-    target: url,
-    wait_ms: wait,
-    total: logs.length,
-    logs
-  });
+    await browser.close();
+
+    res.json({
+      target: url,
+      wait_ms: wait,
+      total: logs.length,
+      logs
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 const PORT = process.env.PORT || 10000;
