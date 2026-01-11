@@ -10,7 +10,7 @@ app.get('/network', async (req, res) => {
   if (!url) return res.json({ error: "URL required" });
 
   const browser = await puppeteer.launch({
-    headless: "new",
+    headless: true,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -40,7 +40,9 @@ app.get('/network', async (req, res) => {
   });
 
   await page.goto(url, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(wait);
+
+  // 🔥 FIX HERE
+  await new Promise(r => setTimeout(r, wait));
 
   await browser.close();
 
@@ -52,7 +54,7 @@ app.get('/network', async (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log("Running on port", PORT);
 });
